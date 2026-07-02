@@ -1,0 +1,56 @@
+services:
+  api:
+    build: .
+    command: sh -c "npx knex migrate:latest && node src/index.js"
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://ecommerce:ecommerce_pw@db:5432/ecommerce
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: sh -c "npx knex migrate:latest && node src/worker.js"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://ecommerce:ecommerce_pw@db:5432/ecommerce
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=ecommerce
+      - POSTGRES_PASSWORD=ecommerce_pw
+      - POSTGRES_DB=ecommerce
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce -d ecommerce"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
